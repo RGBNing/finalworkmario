@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            #canvas {
+                border: 1px solid black;
+            }
+        </style>
+        <script>
+var maptext = `
+
+        wmmmmw
+      w wwwwwwww
+        ww        w w 
+        wwww
+        w
+        w
+        www
+        w
+        w
+wwwww ww
+        w
+        w
+        ww
+        ww
+        w
+        w
+        ww
+        w
+        ww                                              
+        w                                               
+        w w w w                                         m   m                                                                                                                                                                                             
+        w   w   w  w    w                            xxxxxxxxxxxxx                                                                                                                                                              
+                    w                           x                     w        x     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxwwwxwxwxwxwxwxwxwxwxwxwxwxwxwwxwxwxwxwxwxwxw
+                    w                        w  wwww                          x
+                w                      w                                       x
+            w                        wwwwwwwwwwwwwwwwwwwww
+                                    w
+            www       m      w        w
+wwwwwww       wwwwwwwwwwwwwww      w
+        xwxww    wwwwwwwxwwwwwwwwww
+`;
+maptext = maptext.substring(1, maptext.length - 1);
+ 
+            var W = 800;
+            var H = 600;
+            var TILE = 50;
+            var FPS = 30;
+            var G = 1.5;
+            var play = true;
+ 
+            function Map(){
+                this.text = maptext.split('\n');
+                this.y_base = H - TILE * this.text.length;
+
+                this.image1 = new Image(TILE, TILE);
+                this.image1.src = 'spritesgh/Tile.png';
+
+                this.image2 = new Image(TILE, TILE);
+                this.image2.src = 'spritesgh/ttft.png';
+
+                this.monsters  = []
+                for (var row = 0; row < this.text.length; row++){
+                       for (var col = 0; col < this.text[row].length; col++){
+                           var t = this.text[row][col];
+                           var tx = col * TILE;
+                           var ty = this.y_base + row * TILE
+                       
+                           if (t == 'm') {
+                                var m = new Monster(this, tx , ty)
+                                this.monsters.push(m)
+                           }
+
+                       }
+                }           
+
+
+                this.update = function(){
+                    for (var m of this.monsters){
+                       m.update()
+                    }   
+                }       
+                this.draw = function(ctx, cam){
+                    for (var row = 0; row < this.text.length; row++){
+                       for (var col = 0; col < this.text[row].length; col++){
+                            var t = this.text[row][col];
+                            var tx = col * TILE;
+                            var ty = this.y_base + row * TILE
+                            if (t == 'w'){
+                                    //    ctx.fillStyle = '#0c0';
+                                    //    ctx.fillRect(col * TILE, this.y_base + row * TILE,
+                                    //                 TILE, TILE);
+                                    ctx.drawImage(this.image1, tx - cam.x, ty - cam.y, TILE, TILE);
+                                    
+                            }
+                            if (t == 'x'){
+                                    ctx.drawImage(this.image2, tx - cam.x, ty - cam.y, TILE, TILE);
+                            }
+                       }
+                   }
+
+                   for (var m of this.monsters){
+                       m.draw(ctx, cam)
+                   }
+               }
+
+ 
+               this.getPos = function(row, col){
+                   var x = col * TILE
+                   var y = this.y_base + row * TILE
+                   return [x, y]
+               }
+            }
+ 
+            function Player(map){
+                this.speed= 8
+                this.jump = 19
+                this.w = 30
+                this.h = 45
+                this.x = 300
+                this.y = 300
+                this.dx = 0
+                this.dy = 0
+                this.map = map
+                this.live = true
+                
+
+                this.image = new Image(this.w, this.h);
+                this.image.src = 'spritesgh/frame-1.png';
+
+
+                this.update = function(){
+                    if(this.live){
+                        this.dy += G
+                        this.x += this.dx
+                        this.collide()
+                        this.y += this.dy
+                        this.collide()
+
+                        for(var m of map.monsters){
+                            if (collideRects(this, m)){
+                                this.live = false
+                                this.dx = 0
+                                this.dy = -14
+
+                            }
+                        }
+                    }
+
+
+                    else {
+                        this.dy += G
+                        this.x +=this.dx
+                        this.y += this.dy
+                    }
+
+                    
+                }
+
+                this.collide = function(){
+                    var coll_time_x = 0
+                    var coll_time_y = 0
+                
+                    // console.log(this.x, this.y)
+
+                    for (var row = 0; row < this.map.text.length; row++){
+                        for (var col = 0; col < this.map.text[row].length; col++){
+                            var t = this.map.text[row][col];
+                            var [tx, ty] = this.map.getPos(row, col);
+                            var block = {
+                                x: tx,
+                                y: ty,
+                                w: TILE,
+                                h: TILE,
+                            }
+                            if (t == 'w' || t =='x' ){
+                                if(collideRects(this, block)){
+                                    if(this.dx > 0){
+                                        time = (this.x + this.w - tx) / this.dx
+                                        coll_time_x = Math.max(coll_time_x, time);
+                                    }
+                                    if(this.dx < 0){
+                                        time = (this.x - (tx + TILE)) / this.dx
+                                        coll_time_x = Math.max(coll_time_x, time);
+                                    }
+                                    if(this.dy > 0){
+                                        time = (this.y + this.h - ty) / this.dy
+                                        coll_time_y = Math.max(coll_time_y, time);
+                                    }
+                                    if(this.dy < 0){
+                                        time = (this.y - (ty + TILE)) / this.dy
+                                        coll_time_y = Math.max(coll_time_y, time);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (coll_time_x > 0 && coll_time_x <= 1){
+                        this.x -= this.dx * coll_time_x
+                        // this.dx = 0
+                    }
+                    if (coll_time_y > 0 && coll_time_y <= 1){
+                        this.y -= this.dy * coll_time_y
+                         this.dy = 0
+                    }
+                }
+                this.draw = function(ctx, cam){
+                    // ctx.fillStyle = 'red'
+                    // ctx.fillRect(this.x, this.y, this.w, this.h)
+
+                    ctx.drawImage(this.image, this.x - cam.x, this.y - cam.y, this.w, this.h);
+                }
+            }
+
+
+            function Monster(map, x, y){
+                this.speed= 6
+                this.w = 30
+                this.h = 45
+                this.x = x
+                this.y = y
+                this.dx = -this.speed
+                this.dy = 0
+                this.map = map
+                
+
+                this.image = new Image(this.w, this.h);
+                this.image.src = 'spritesgh/Monster.png';
+
+
+                this.update = function(){
+                    this.dy += G
+                    this.x += this.dx
+                    this.collide()
+                    this.y += this.dy
+                    this.collide()
+                }
+
+                this.collide = function(){
+                    var coll_time_x = 0
+                    var coll_time_y = 0
+                
+                    // console.log(this.x, this.y)
+
+                    for (var row = 0; row < this.map.text.length; row++){
+                        for (var col = 0; col < this.map.text[row].length; col++){
+                            var t = this.map.text[row][col];
+                            var [tx, ty] = this.map.getPos(row, col);
+                            var block = {
+                                x: tx,
+                                y: ty,
+                                w: TILE,
+                                h: TILE,
+                            }
+                            if (t == 'w' || t =='x' ){
+                                if(collideRects(this, block)){
+                                    if(this.dx > 0){
+                                        time = (this.x + this.w - tx) / this.dx
+                                        coll_time_x = Math.max(coll_time_x, time);
+                                    }
+                                    if(this.dx < 0){
+                                        time = (this.x - (tx + TILE)) / this.dx
+                                        coll_time_x = Math.max(coll_time_x, time);
+                                    }
+                                    if(this.dy > 0){
+                                        time = (this.y + this.h - ty) / this.dy
+                                        coll_time_y = Math.max(coll_time_y, time);
+                                    }
+                                    if(this.dy < 0){
+                                        time = (this.y - (ty + TILE)) / this.dy
+                                        coll_time_y = Math.max(coll_time_y, time);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (coll_time_x > 0 && coll_time_x <= 1){
+                        this.x -= this.dx * coll_time_x
+                       this.dx *= -1
+                    }
+                    if (coll_time_y > 0 && coll_time_y <= 1){
+                        this.y -= this.dy * coll_time_y
+                         this.dy = 0
+                    }
+                }
+                this.draw = function(ctx, cam){
+                    // ctx.fillStyle = 'red'
+                    // ctx.fillRect(this.x, this.y, this.w, this.h)
+
+                    ctx.drawImage(this.image, this.x - cam.x, this.y - cam.y, this.w, this.h);
+                }
+                
+            }
+
+            
+            function collideRects(a, b){
+                return a.x +a.w > b.x &&
+                        a.x < b.x + b.w &&
+                        a.y + a.h > b.y &&
+                        a.y < b.y +b.h 
+            }
+
+            function Camera(target){
+                this.target = target
+
+                this.x = 0
+                this.y = 0
+
+                this.update = function(){
+                    if(target.live){
+                    this.x = target.x - W / 2
+                    this.y = target.y - H / 2
+                    }    
+                }
+            }
+ 
+            function onLoad(){
+                var canvas = document.getElementById('canvas');
+                var ctx = canvas.getContext('2d');
+                
+                var score = 0;
+                var map = new Map();
+                var pl = new Player(map);
+                var cam = new Camera(pl)
+
+ 
+                function drawScore(ctx){
+                    ctx.font = '40px Tahoma';
+                    ctx.fillStyle = '#000';
+                    ctx.fillText(score + '', W / 2, H*0.1);
+                }
+ 
+                function draw(){
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, W, H);
+                   map.update()
+                    pl.update()
+                    cam.update()
+                    map.draw(ctx, cam)
+                    pl.draw(ctx, cam)
+ 
+                    if (play){
+                        setTimeout(draw, 1000/FPS);
+                    }
+                }
+               
+                draw();
+ 
+                document.addEventListener('keydown', function(e){
+                   if ( e.key == ' ' && pl.live){
+                       pl.dy = -pl.jump
+                   }
+                   if (e.key == 'ArrowRight' && pl.live){
+                       pl.dx = pl.speed
+                   }
+                   if (e.key == 'ArrowLeft' && pl.live){
+                       pl.dx = -pl.speed
+                   }
+                });
+ 
+                document.addEventListener('keyup', function(e){
+                if (e.key == 'ArrowRight' && pl.dx > 0){
+                    pl.dx = 0
+                }
+                if (e.key == 'ArrowLeft' && pl.dx < 0){
+                    pl.dx = 0
+                }
+                });
+            }
+        </script>
+    </head>
+    <body>
+       <canvas id="canvas" width="800" height="600">
+       </canvas>
+       <script>
+           onLoad();
+       </script>
+    </body>
+</html>
